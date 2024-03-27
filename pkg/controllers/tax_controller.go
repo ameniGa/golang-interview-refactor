@@ -18,7 +18,7 @@ func (t *TaxController) ShowAddItemForm(c *gin.Context) {
 		c.SetCookie("ice_session_id", time.Now().String(), 3600, "/", "localhost", false, true)
 	}
 
-	calculator.GetCartData(c)
+	t.calculator.GetCartData(c)
 }
 
 func (t *TaxController) AddItem(c *gin.Context) {
