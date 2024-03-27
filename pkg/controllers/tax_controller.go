@@ -40,5 +40,5 @@ func (t *TaxController) DeleteCartItem(c *gin.Context) {
 		return
 	}
 
-	calculator.DeleteCartItem(c)
+	t.calculator.DeleteCartItem(c)
 }
