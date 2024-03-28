@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"interview/pkg/calculator"
 	"interview/pkg/controllers"
@@ -18,7 +19,11 @@ func main() {
 		"bag":   300,
 		"watch": 300,
 	}
-	taxController := controllers.NewTaxController(calculator.NewCalculator(itemPriceMapping, db.GetDatabase()))
+	cal, err := calculator.NewCalculator(itemPriceMapping, db.GetDatabase())
+	if err != nil {
+		fmt.Println(err)
+	}
+	taxController := controllers.NewTaxController(cal)
 	ginEngine.GET("/", taxController.ShowAddItemForm)
 	ginEngine.POST("/add-item", taxController.AddItem)
 	ginEngine.GET("/remove-cart-item", taxController.DeleteCartItem)

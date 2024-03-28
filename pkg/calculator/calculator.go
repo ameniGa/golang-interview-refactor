@@ -20,8 +20,14 @@ type calculator struct {
 	priceMapping map[string]float64
 }
 
-func NewCalculator(itemPriceMapping map[string]float64, db *gorm.DB) Handler {
-	return &calculator{db: db, priceMapping: itemPriceMapping}
+func NewCalculator(itemPriceMapping map[string]float64, db *gorm.DB) (Handler, error) {
+	if itemPriceMapping == nil {
+		return nil, errors.New("missing prices config")
+	}
+	if db == nil {
+		panic("invalid db connection")
+	}
+	return &calculator{db: db, priceMapping: itemPriceMapping}, nil
 }
 
 type CartItem struct {
