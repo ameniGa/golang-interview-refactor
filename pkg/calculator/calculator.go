@@ -16,7 +16,7 @@ import (
 
 type Handler interface {
 	AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response
-	DeleteCartItem(c *gin.Context)
+	DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response
 	GetCartData(c *gin.Context)
 }
 
@@ -43,10 +43,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return Response{
-				Code:        302,
-				RedirectURL: "/",
-			}
+			return Response{Code: 302, RedirectURL: "/"}
 		}
 		isCartNew = true
 		cartEntity = entity.CartEntity{
@@ -111,45 +108,33 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 }
 
-func (cal *calculator) DeleteCartItem(c *gin.Context) {
-	cartItemIDString := c.Query("cart_item_id")
-	if cartItemIDString == "" {
-		c.Redirect(302, "/")
-		return
-	}
-
-	cookie, _ := c.Request.Cookie("ice_session_id")
-
+func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
 	db := cal.db
 
 	var cartEntity entity.CartEntity
-	result := db.Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, cookie.Value)).First(&cartEntity)
+	result := db.WithContext(ctx).Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, sessionID)).First(&cartEntity)
 	if result.Error != nil {
-		c.Redirect(302, "/")
-		return
+		return Response{Code: 302, RedirectURL: "/"}
 	}
 
 	if cartEntity.Status == entity.CartClosed {
-		c.Redirect(302, "/")
-		return
+		return Response{Code: 302, RedirectURL: "/"}
 	}
 
-	cartItemID, err := strconv.Atoi(cartItemIDString)
+	_cartItemID, err := strconv.Atoi(cartItemID)
 	if err != nil {
-		c.Redirect(302, "/")
-		return
+		return Response{Code: 302, RedirectURL: "/"}
 	}
 
 	var cartItemEntity entity.CartItem
 
-	result = db.Where(" ID  = ?", cartItemID).First(&cartItemEntity)
+	result = db.WithContext(ctx).Where(" ID  = ?", _cartItemID).First(&cartItemEntity)
 	if result.Error != nil {
-		c.Redirect(302, "/")
-		return
+		return Response{Code: 302, RedirectURL: "/"}
 	}
 
 	db.Delete(&cartItemEntity)
-	c.Redirect(302, "/")
+	return Response{Code: 302, RedirectURL: "/"}
 }
 
 func (cal *calculator) GetCartData(c *gin.Context) {

@@ -54,11 +54,17 @@ func (t *TaxController) AddItem(c *gin.Context) {
 
 func (t *TaxController) DeleteCartItem(c *gin.Context) {
 	cookie, err := c.Request.Cookie("ice_session_id")
-
 	if err != nil || errors.Is(err, http.ErrNoCookie) || (cookie != nil && cookie.Value == "") {
 		c.Redirect(302, "/")
 		return
 	}
 
-	t.calculator.DeleteCartItem(c)
+	cartItemIDString := c.Query("cart_item_id")
+	if cartItemIDString == "" {
+		c.Redirect(302, "/")
+		return
+	}
+
+	res := t.calculator.DeleteCartItem(c, cookie.Value, cartItemIDString)
+	c.Redirect(res.Code, res.RedirectURL)
 }
