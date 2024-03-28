@@ -1,10 +1,10 @@
 package calculator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 	"html/template"
 	db2 "interview/pkg/db"
@@ -15,7 +15,7 @@ import (
 )
 
 type Handler interface {
-	AddItemToCart(c *gin.Context)
+	AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response
 	DeleteCartItem(c *gin.Context)
 	GetCartData(c *gin.Context)
 }
@@ -29,66 +29,71 @@ func NewCalculator(itemPriceMapping map[string]float64, db *gorm.DB) Handler {
 	return &calculator{db: db, priceMapping: itemPriceMapping}
 }
 
-func (cal *calculator) AddItemToCart(c *gin.Context) {
-	cookie, _ := c.Request.Cookie("ice_session_id")
+type CartItem struct {
+	Product  string
+	Quantity string
+}
 
+func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response {
 	db := cal.db
 
 	var isCartNew bool
 	var cartEntity entity.CartEntity
-	result := db.Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, cookie.Value)).First(&cartEntity)
+	result := db.WithContext(ctx).Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, sessionID)).First(&cartEntity)
 
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			c.Redirect(302, "/")
-			return
+			return Response{
+				Code:        302,
+				RedirectURL: "/",
+			}
 		}
 		isCartNew = true
 		cartEntity = entity.CartEntity{
-			SessionID: cookie.Value,
+			SessionID: sessionID,
 			Status:    entity.CartOpen,
 		}
 		db.Create(&cartEntity)
 	}
 
-	addItemForm, err := getCartItemForm(c)
-	if err != nil {
-		c.Redirect(302, "/?error="+err.Error())
-		return
-	}
-
-	item, ok := cal.priceMapping[addItemForm.Product]
+	item, ok := cal.priceMapping[data.Product]
 	if !ok {
-		c.Redirect(302, "/?error=invalid item name")
-		return
+		return Response{
+			Code:        302,
+			RedirectURL: "/?error=invalid item name",
+		}
 	}
 
-	quantity, err := strconv.ParseInt(addItemForm.Quantity, 10, 0)
+	quantity, err := strconv.ParseInt(data.Quantity, 10, 0)
 	if err != nil {
-		c.Redirect(302, "/?error=invalid quantity")
-		return
+		return Response{
+			Code:        302,
+			RedirectURL: "/?error=invalid quantity",
+		}
 	}
 
 	var cartItemEntity entity.CartItem
 	if isCartNew {
 		cartItemEntity = entity.CartItem{
 			CartID:      cartEntity.ID,
-			ProductName: addItemForm.Product,
+			ProductName: data.Product,
 			Quantity:    int(quantity),
 			Price:       item * float64(quantity),
 		}
 		db.Create(&cartItemEntity)
 	} else {
-		result = db.Where(" cart_id = ? and product_name  = ?", cartEntity.ID, addItemForm.Product).First(&cartItemEntity)
+		result = db.Where(" cart_id = ? and product_name  = ?", cartEntity.ID, data.Product).First(&cartItemEntity)
 
 		if result.Error != nil {
 			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-				c.Redirect(302, "/")
-				return
+				return Response{
+					Code:        302,
+					RedirectURL: "/",
+				}
 			}
 			cartItemEntity = entity.CartItem{
 				CartID:      cartEntity.ID,
-				ProductName: addItemForm.Product,
+				ProductName: data.Product,
 				Quantity:    int(quantity),
 				Price:       item * float64(quantity),
 			}
@@ -100,8 +105,10 @@ func (cal *calculator) AddItemToCart(c *gin.Context) {
 			db.Save(&cartItemEntity)
 		}
 	}
-
-	c.Redirect(302, "/")
+	return Response{
+		Code:        302,
+		RedirectURL: "/",
+	}
 }
 
 func (cal *calculator) DeleteCartItem(c *gin.Context) {
@@ -167,26 +174,6 @@ func (cal *calculator) GetCartData(c *gin.Context) {
 	c.String(200, html)
 }
 
-type CartItemForm struct {
-	Product  string `form:"product"   binding:"required"`
-	Quantity string `form:"quantity"  binding:"required"`
-}
-
-func getCartItemForm(c *gin.Context) (*CartItemForm, error) {
-	if c.Request.Body == nil {
-		return nil, fmt.Errorf("body cannot be nil")
-	}
-
-	form := &CartItemForm{}
-
-	if err := binding.FormPost.Bind(c.Request, form); err != nil {
-		log.Println(err.Error())
-		return nil, err
-	}
-
-	return form, nil
-}
-
 func getCartItemData(sessionID string) (items []map[string]interface{}) {
 	db := db2.GetDatabase()
 	var cartEntity entity.CartEntity
@@ -217,7 +204,7 @@ func getCartItemData(sessionID string) (items []map[string]interface{}) {
 
 func renderTemplate(pageData interface{}) (string, error) {
 	// Read and parse the HTML template file
-	tmpl, err := template.ParseFiles("../../static/add_item_form.html")
+	tmpl, err := template.ParseFiles("static/add_item_form.html")
 	if err != nil {
 		return "", fmt.Errorf("Error parsing template: %v ", err)
 	}
