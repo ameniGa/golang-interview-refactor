@@ -38,8 +38,8 @@ type CartItem struct {
 func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response {
 	if sessionID == "" || data.Quantity == "" || data.Product == "" {
 		return Response{
-			Code:        302,
-			Error:       errors.New("invalid arguments"),
+			Code:  302,
+			Error: errors.New("invalid arguments"),
 		}
 	}
 
@@ -55,7 +55,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 			Status:    entity.CartOpen,
 		}
 		err := cal.addCart(ctx, &cartEntity)
-	    if err != nil {
+		if err != nil {
 			return Response{Code: 302, Error: err}
 		}
 	}
@@ -63,15 +63,15 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	item, ok := cal.priceMapping[data.Product]
 	if !ok {
 		return Response{
-			Code:        302,
-			Error:       errors.New("invalid item name"),
+			Code:  302,
+			Error: errors.New("invalid item name"),
 		}
 	}
 	quantity, err := strconv.ParseInt(data.Quantity, 10, 0)
 	if err != nil {
 		return Response{
-			Code:        302,
-			Error:       errors.New("invalid quantity"),
+			Code:  302,
+			Error: errors.New("invalid quantity"),
 		}
 	}
 
@@ -79,7 +79,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		cartItemEntity, err := cal.getItem(ctx, cartEntity.ID, data.Product)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return Response{
-				Code:        302,
+				Code: 302,
 			}
 		}
 		if err == nil {
@@ -87,7 +87,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 			cartItemEntity.Price += item * float64(quantity)
 			cal.saveItem(ctx, &cartItemEntity)
 			return Response{
-				Code:        302,
+				Code: 302,
 			}
 		}
 	}
@@ -100,7 +100,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	return Response{
 		Code:        302,
 		RedirectURL: "/",
-		Error: err,
+		Error:       err,
 	}
 }
 
@@ -110,16 +110,15 @@ func (cal *calculator) getCart(ctx context.Context, sessionID string) (entity.Ca
 	return cartEntity, result.Error
 }
 
-func (cal *calculator) addCart(ctx context.Context, cart *entity.CartEntity)  error {
+func (cal *calculator) addCart(ctx context.Context, cart *entity.CartEntity) error {
 	res := cal.db.WithContext(ctx).Create(cart)
 	return res.Error
 }
 
-func (cal *calculator) saveItem(ctx context.Context, item *entity.CartItem)  error {
+func (cal *calculator) saveItem(ctx context.Context, item *entity.CartItem) error {
 	res := cal.db.WithContext(ctx).Save(item)
-	return  res.Error
+	return res.Error
 }
-
 
 func (cal *calculator) getItem(ctx context.Context, id uint, productName string) (entity.CartItem, error) {
 	var cartItemEntity entity.CartItem
@@ -127,12 +126,20 @@ func (cal *calculator) getItem(ctx context.Context, id uint, productName string)
 	return cartItemEntity, res.Error
 }
 
-func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
-	db := cal.db
+func (cal *calculator) getItemByID(ctx context.Context, id uint) (entity.CartItem, error) {
+	var cartItemEntity entity.CartItem
+	res := cal.db.WithContext(ctx).Where(" ID  = ?", id).First(&cartItemEntity)
+	return cartItemEntity, res.Error
+}
 
-	var cartEntity entity.CartEntity
-	result := db.WithContext(ctx).Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, sessionID)).First(&cartEntity)
-	if result.Error != nil {
+func (cal *calculator) deleteItem(ctx context.Context, item entity.CartItem) error {
+	res := cal.db.WithContext(ctx).Delete(&item)
+	return res.Error
+}
+
+func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
+	cartEntity, err := cal.getCart(ctx, sessionID)
+	if err != nil {
 		return Response{Code: 302, RedirectURL: "/"}
 	}
 
@@ -145,15 +152,13 @@ func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID
 		return Response{Code: 302, RedirectURL: "/"}
 	}
 
-	var cartItemEntity entity.CartItem
-
-	result = db.WithContext(ctx).Where(" ID  = ?", _cartItemID).First(&cartItemEntity)
-	if result.Error != nil {
+	cartItemEntity, err := cal.getItemByID(ctx, uint(_cartItemID))
+	if err != nil {
 		return Response{Code: 302, RedirectURL: "/"}
 	}
 
-	db.Delete(&cartItemEntity)
-	return Response{Code: 302, RedirectURL: "/"}
+	err = cal.deleteItem(ctx, cartItemEntity)
+	return Response{Code: 302, RedirectURL: "/", Error: err}
 }
 
 func (cal *calculator) GetCartData(ctx context.Context, sessionID string) Response {
@@ -198,4 +203,3 @@ func (cal *calculator) getCartItemData(ctx context.Context, sessionID string) (i
 	}
 	return items
 }
-
