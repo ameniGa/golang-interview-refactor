@@ -167,25 +167,24 @@ func (cal *calculator) GetCartData(ctx context.Context, sessionID string) Respon
 			Code: 200,
 		}
 	}
-	data := cal.getCartItemData(ctx, sessionID)
+	data := cal.getCartItems(ctx, sessionID)
 	return Response{
 		Code: 200,
 		Data: data,
 	}
 }
 
-func (cal *calculator) getCartItemData(ctx context.Context, sessionID string) (items []map[string]interface{}) {
+func (cal *calculator) getCartItems(ctx context.Context, sessionID string) (items []map[string]interface{}) {
 	db := cal.db
 
-	var cartEntity entity.CartEntity
-	result := db.WithContext(ctx).Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, sessionID)).First(&cartEntity)
-	if result.Error != nil {
+	cartEntity, err := cal.getCart(ctx, sessionID)
+	if err != nil {
 		// TODO should return error in case of some error != recordNotFound
 		return
 	}
 
 	var cartItems []entity.CartItem
-	result = db.WithContext(ctx).Where(fmt.Sprintf("cart_id = %d", cartEntity.ID)).Find(&cartItems)
+	result := db.WithContext(ctx).Where(fmt.Sprintf("cart_id = %d", cartEntity.ID)).Find(&cartItems)
 	if result.Error != nil {
 		// TODO should return error in case of some error != recordNotFound
 		return
