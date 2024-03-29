@@ -36,6 +36,13 @@ type CartItem struct {
 }
 
 func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response {
+	if sessionID == "" || data.Quantity == "" || data.Product == "" {
+		return Response{
+			Code:        302,
+			RedirectURL: "/?error=invalid arguments",
+			Error:       errors.New("invalid arguments"),
+		}
+	}
 	db := cal.db
 
 	var isCartNew bool
@@ -44,14 +51,14 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return Response{Code: 302, RedirectURL: "/"}
+			return Response{Code: 302, RedirectURL: "/", Error: result.Error}
 		}
 		isCartNew = true
 		cartEntity = entity.CartEntity{
 			SessionID: sessionID,
 			Status:    entity.CartOpen,
 		}
-		db.Create(&cartEntity)
+		db.WithContext(ctx).Create(&cartEntity)
 	}
 
 	item, ok := cal.priceMapping[data.Product]
@@ -59,6 +66,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		return Response{
 			Code:        302,
 			RedirectURL: "/?error=invalid item name",
+			Error:       errors.New("invalid item name"),
 		}
 	}
 
@@ -67,6 +75,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		return Response{
 			Code:        302,
 			RedirectURL: "/?error=invalid quantity",
+			Error:       errors.New("invalid quantity"),
 		}
 	}
 
@@ -78,7 +87,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 			Quantity:    int(quantity),
 			Price:       item * float64(quantity),
 		}
-		db.Create(&cartItemEntity)
+		db.WithContext(ctx).Create(&cartItemEntity)
 	} else {
 		result = db.Where(" cart_id = ? and product_name  = ?", cartEntity.ID, data.Product).First(&cartItemEntity)
 
