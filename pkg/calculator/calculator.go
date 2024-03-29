@@ -166,12 +166,14 @@ func (cal *calculator) getCartItemData(ctx context.Context, sessionID string) (i
 	var cartEntity entity.CartEntity
 	result := db.WithContext(ctx).Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, sessionID)).First(&cartEntity)
 	if result.Error != nil {
+		// TODO should return error in case of some error != recordNotFound
 		return
 	}
 
 	var cartItems []entity.CartItem
 	result = db.WithContext(ctx).Where(fmt.Sprintf("cart_id = %d", cartEntity.ID)).Find(&cartItems)
 	if result.Error != nil {
+		// TODO should return error in case of some error != recordNotFound
 		return
 	}
 

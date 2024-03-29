@@ -223,6 +223,67 @@ func TestCalculator_DeleteCartItem(t *testing.T) {
 	})
 }
 
+func TestCalculator_GetCartData(t *testing.T) {
+	gormDB, mock := NewMockDB()
+	calc, _ := NewCalculator(itemPriceMapping, gormDB)
+	sessionID := "123456"
+
+	t.Run("get cart successfully", func(t *testing.T) {
+		// get cart
+		cartID := 1
+		cart := sqlmock.NewRows([]string{"id", "session_id"}).
+			AddRow(cartID, sessionID)
+		mock.ExpectQuery("SELECT (.+)").WillReturnRows(cart)
+
+		// get items
+		items := sqlmock.NewRows([]string{"id", "cart_id"}).
+			AddRow(1, cartID).AddRow(2, cartID)
+		mock.ExpectQuery("SELECT (.+)").WillReturnRows(items)
+
+		res := calc.GetCartData(context.TODO(), sessionID)
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.NotNil(t, res.Data)
+	})
+
+	t.Run("empty sessionID", func(t *testing.T) {
+		res := calc.GetCartData(context.TODO(), "")
+		assert.Nil(t, res.Data)
+	})
+
+	t.Run("failed to get cart", func(t *testing.T) {
+		// get cart
+		mock.ExpectQuery("SELECT (.+)").WillReturnError(gorm.ErrNotImplemented)
+
+		res := calc.GetCartData(context.TODO(), sessionID)
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.Nil(t, res.Data)
+	})
+
+	t.Run("non existing cart", func(t *testing.T) {
+		// get cart
+		mock.ExpectQuery("SELECT (.+)").WillReturnError(gorm.ErrRecordNotFound)
+
+		res := calc.GetCartData(context.TODO(), sessionID)
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.Nil(t, res.Data)
+	})
+
+	t.Run("failed to get cart items", func(t *testing.T) {
+		// get cart
+		cartID := 1
+		cart := sqlmock.NewRows([]string{"id", "session_id"}).
+			AddRow(cartID, sessionID)
+		mock.ExpectQuery("SELECT (.+)").WillReturnRows(cart)
+
+		// get items
+		mock.ExpectQuery("SELECT (.+)").WillReturnError(gorm.ErrInvalidValueOfLength)
+
+		res := calc.GetCartData(context.TODO(), sessionID)
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.Nil(t, res.Data)
+	})
+}
+
 func NewMockDB() (*gorm.DB, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
