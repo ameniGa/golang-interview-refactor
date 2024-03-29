@@ -78,7 +78,8 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		cartItemEntity, err := cal.repo.GetItem(ctx, cartEntity.ID, data.Product)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return Response{
-				Code: 302,
+				Code:  302,
+				Error: err,
 			}
 		}
 		if err == nil {
@@ -98,34 +99,33 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		Price:       item * float64(quantity),
 	})
 	return Response{
-		Code:        302,
-		RedirectURL: "/",
-		Error:       err,
+		Code:  302,
+		Error: err,
 	}
 }
 
 func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
 	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
 	if err != nil {
-		return Response{Code: 302, RedirectURL: "/"}
+		return Response{Code: 302}
 	}
 
 	if cartEntity.Status == entity.CartClosed {
-		return Response{Code: 302, RedirectURL: "/"}
+		return Response{Code: 302}
 	}
 
 	_cartItemID, err := strconv.Atoi(cartItemID)
 	if err != nil {
-		return Response{Code: 302, RedirectURL: "/"}
+		return Response{Code: 302}
 	}
 
 	cartItemEntity, err := cal.repo.GetItemByID(ctx, uint(_cartItemID))
 	if err != nil {
-		return Response{Code: 302, RedirectURL: "/"}
+		return Response{Code: 302}
 	}
 
 	err = cal.repo.DeleteItem(ctx, cartItemEntity)
-	return Response{Code: 302, RedirectURL: "/", Error: err}
+	return Response{Code: 302, Error: err}
 }
 
 func (cal *calculator) GetCartData(ctx context.Context, sessionID string) Response {

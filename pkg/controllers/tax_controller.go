@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"html/template"
 	"interview/pkg/calculator"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -32,15 +31,13 @@ func (t *TaxController) ShowAddItemForm(c *gin.Context) {
 	}
 
 	res := t.calculator.GetCartData(c, cookie.Value)
-	fmt.Println(res)
 	if res.Data != nil {
 		data["CartItems"] = res.Data
 	}
 
 	html, err := renderTemplate(data)
 	if err != nil {
-		log.Println(err)
-		c.AbortWithStatus(500)
+		handleError(c, 500, err)
 		return
 	}
 
@@ -71,7 +68,7 @@ func (t *TaxController) AddItem(c *gin.Context) {
 		Product:  form.Product,
 		Quantity: form.Quantity,
 	})
-	c.Redirect(res.Code, res.RedirectURL)
+	handleError(c, res.Code, res.Error)
 }
 
 func (t *TaxController) DeleteCartItem(c *gin.Context) {
@@ -88,7 +85,7 @@ func (t *TaxController) DeleteCartItem(c *gin.Context) {
 	}
 
 	res := t.calculator.DeleteCartItem(c, cookie.Value, cartItemIDString)
-	c.Redirect(res.Code, res.RedirectURL)
+	handleError(c, res.Code, res.Error)
 }
 
 func renderTemplate(pageData interface{}) (string, error) {
@@ -110,4 +107,19 @@ func renderTemplate(pageData interface{}) (string, error) {
 	resultString := renderedTemplate.String()
 
 	return resultString, nil
+}
+
+func handleError(c *gin.Context, code int, err error) {
+	switch code {
+	case 302:
+		if err != nil {
+			c.Redirect(302, fmt.Sprintf("/?error=%v", err.Error()))
+			return
+		}
+		c.Redirect(302, "/")
+		return
+	case 500:
+		c.AbortWithStatus(500)
+		return
+	}
 }
