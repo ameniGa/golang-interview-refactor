@@ -10,8 +10,16 @@ import (
 	. "interview/pkg/calculator"
 	"interview/pkg/entity"
 	"log"
+	"strconv"
 	"testing"
 )
+
+var itemPriceMapping = map[string]float64{
+	"shoe":  100,
+	"purse": 200,
+	"bag":   300,
+	"watch": 300,
+}
 
 func TestNewCalculator(t *testing.T) {
 	dbMock, _ := NewMockDB()
@@ -31,12 +39,6 @@ func TestNewCalculator(t *testing.T) {
 }
 
 func TestCalculator_AddItemToCart(t *testing.T) {
-	itemPriceMapping := map[string]float64{
-		"shoe":  100,
-		"purse": 200,
-		"bag":   300,
-		"watch": 300,
-	}
 	gormDB, mock := NewMockDB()
 	calc, _ := NewCalculator(itemPriceMapping, gormDB)
 	sessionID := "123456"
@@ -151,6 +153,71 @@ func TestCalculator_AddItemToCart(t *testing.T) {
 			Quantity: fmt.Sprint(newQuantity),
 		})
 
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.NoError(t, res.Error)
+	})
+}
+
+func TestCalculator_DeleteCartItem(t *testing.T) {
+	gormDB, mock := NewMockDB()
+	calc, _ := NewCalculator(itemPriceMapping, gormDB)
+	sessionID := "123456"
+
+	t.Run("delete successfully", func(t *testing.T) {
+		// get cart
+		cartID := 1
+		cart := sqlmock.NewRows([]string{"id", "session_id", "status"}).
+			AddRow(cartID, sessionID, entity.CartOpen)
+		mock.ExpectQuery("SELECT (.+)").WillReturnRows(cart)
+
+		// get item
+		itemID := 1
+		item := sqlmock.NewRows([]string{"id", "cart_id"}).
+			AddRow(itemID, cartID)
+		mock.ExpectQuery("SELECT (.+)").WithArgs(itemID).WillReturnRows(item)
+
+		mock.ExpectBegin()
+		mock.ExpectExec("UPDATE (.+)").WillReturnResult(sqlmock.NewResult(int64(itemID), 1))
+		mock.ExpectCommit()
+
+		res := calc.DeleteCartItem(context.Background(), sessionID, strconv.Itoa(itemID))
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.NoError(t, res.Error)
+	})
+
+	t.Run("cart already closed", func(t *testing.T) {
+		// get cart
+		cartID := 1
+		cart := sqlmock.NewRows([]string{"id", "session_id", "status"}).
+			AddRow(cartID, sessionID, entity.CartClosed)
+		mock.ExpectQuery("SELECT (.+)").WillReturnRows(cart)
+
+		res := calc.DeleteCartItem(context.Background(), sessionID, "1")
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.NoError(t, res.Error)
+	})
+
+	t.Run("cart not found", func(t *testing.T) {
+		// get cart
+		mock.ExpectQuery("SELECT (.+)").WillReturnError(gorm.ErrRecordNotFound)
+
+		res := calc.DeleteCartItem(context.Background(), sessionID, "1")
+		assert.Nil(t, mock.ExpectationsWereMet())
+		assert.NoError(t, res.Error)
+	})
+
+	t.Run("item not found", func(t *testing.T) {
+		// get cart
+		cartID := 1
+		cart := sqlmock.NewRows([]string{"id", "session_id", "status"}).
+			AddRow(cartID, sessionID, entity.CartOpen)
+		mock.ExpectQuery("SELECT (.+)").WillReturnRows(cart)
+
+		// get item
+		itemID := 1
+		mock.ExpectQuery("SELECT (.+)").WithArgs(itemID).WillReturnError(gorm.ErrRecordNotFound)
+
+		res := calc.DeleteCartItem(context.Background(), sessionID, strconv.Itoa(itemID))
 		assert.Nil(t, mock.ExpectationsWereMet())
 		assert.NoError(t, res.Error)
 	})
