@@ -23,24 +23,27 @@ var itemPriceMapping = map[string]float64{
 
 func TestNewCalculator(t *testing.T) {
 	dbMock, _ := NewMockDB()
+	repo := NewRepository(dbMock)
 	t.Run("nil prices map", func(t *testing.T) {
-		_, err := NewCalculator(nil, dbMock)
+		_, err := NewCalculator(nil, repo)
 		assert.Error(t, err)
 	})
-	t.Run("nil db", func(t *testing.T) {
+	t.Run("nil repo", func(t *testing.T) {
 		assert.Panics(t, func() {
 			_, _ = NewCalculator(map[string]float64{"bag": 10}, nil)
 		})
 	})
 	t.Run("valid ", func(t *testing.T) {
-		h, _ := NewCalculator(map[string]float64{"bag": 10}, dbMock)
+		h, _ := NewCalculator(map[string]float64{"bag": 10}, repo)
 		assert.NotNil(t, h)
 	})
 }
 
 func TestCalculator_AddItemToCart(t *testing.T) {
 	gormDB, mock := NewMockDB()
-	calc, _ := NewCalculator(itemPriceMapping, gormDB)
+	repo := NewRepository(gormDB)
+
+	calc, _ := NewCalculator(itemPriceMapping, repo)
 	sessionID := "123456"
 
 	t.Run("missing sessionID", func(t *testing.T) {
@@ -160,7 +163,8 @@ func TestCalculator_AddItemToCart(t *testing.T) {
 
 func TestCalculator_DeleteCartItem(t *testing.T) {
 	gormDB, mock := NewMockDB()
-	calc, _ := NewCalculator(itemPriceMapping, gormDB)
+	repo := NewRepository(gormDB)
+	calc, _ := NewCalculator(itemPriceMapping, repo)
 	sessionID := "123456"
 
 	t.Run("delete successfully", func(t *testing.T) {
@@ -225,7 +229,8 @@ func TestCalculator_DeleteCartItem(t *testing.T) {
 
 func TestCalculator_GetCartData(t *testing.T) {
 	gormDB, mock := NewMockDB()
-	calc, _ := NewCalculator(itemPriceMapping, gormDB)
+	repo := NewRepository(gormDB)
+	calc, _ := NewCalculator(itemPriceMapping, repo)
 	sessionID := "123456"
 
 	t.Run("get cart successfully", func(t *testing.T) {

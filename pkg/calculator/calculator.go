@@ -3,7 +3,6 @@ package calculator
 import (
 	"context"
 	"errors"
-	"fmt"
 	"gorm.io/gorm"
 	"interview/pkg/entity"
 	"strconv"
@@ -16,18 +15,18 @@ type Handler interface {
 }
 
 type calculator struct {
-	db           *gorm.DB
+	repo         Repository
 	priceMapping map[string]float64
 }
 
-func NewCalculator(itemPriceMapping map[string]float64, db *gorm.DB) (Handler, error) {
+func NewCalculator(itemPriceMapping map[string]float64, repo Repository) (Handler, error) {
 	if itemPriceMapping == nil {
 		return nil, errors.New("missing prices config")
 	}
-	if db == nil {
-		panic("invalid db connection")
+	if repo == nil {
+		panic("missing repository")
 	}
-	return &calculator{db: db, priceMapping: itemPriceMapping}, nil
+	return &calculator{repo: repo, priceMapping: itemPriceMapping}, nil
 }
 
 type CartItem struct {
@@ -44,7 +43,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 
 	var isCartNew bool
-	cartEntity, err := cal.getCart(ctx, sessionID)
+	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return Response{Code: 302, Error: err}
@@ -54,7 +53,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 			SessionID: sessionID,
 			Status:    entity.CartOpen,
 		}
-		err := cal.addCart(ctx, &cartEntity)
+		err := cal.repo.AddCart(ctx, &cartEntity)
 		if err != nil {
 			return Response{Code: 302, Error: err}
 		}
@@ -76,7 +75,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 
 	if !isCartNew {
-		cartItemEntity, err := cal.getItem(ctx, cartEntity.ID, data.Product)
+		cartItemEntity, err := cal.repo.GetItem(ctx, cartEntity.ID, data.Product)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return Response{
 				Code: 302,
@@ -85,13 +84,14 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		if err == nil {
 			cartItemEntity.Quantity += int(quantity)
 			cartItemEntity.Price += item * float64(quantity)
-			cal.saveItem(ctx, &cartItemEntity)
+			err = cal.repo.SaveItem(ctx, &cartItemEntity)
 			return Response{
-				Code: 302,
+				Code:  302,
+				Error: err,
 			}
 		}
 	}
-	err = cal.saveItem(ctx, &entity.CartItem{
+	err = cal.repo.SaveItem(ctx, &entity.CartItem{
 		CartID:      cartEntity.ID,
 		ProductName: data.Product,
 		Quantity:    int(quantity),
@@ -104,41 +104,8 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 }
 
-func (cal *calculator) getCart(ctx context.Context, sessionID string) (entity.CartEntity, error) {
-	var cartEntity entity.CartEntity
-	result := cal.db.WithContext(ctx).Where(fmt.Sprintf("status = '%s' AND session_id = '%s'", entity.CartOpen, sessionID)).First(&cartEntity)
-	return cartEntity, result.Error
-}
-
-func (cal *calculator) addCart(ctx context.Context, cart *entity.CartEntity) error {
-	res := cal.db.WithContext(ctx).Create(cart)
-	return res.Error
-}
-
-func (cal *calculator) saveItem(ctx context.Context, item *entity.CartItem) error {
-	res := cal.db.WithContext(ctx).Save(item)
-	return res.Error
-}
-
-func (cal *calculator) getItem(ctx context.Context, id uint, productName string) (entity.CartItem, error) {
-	var cartItemEntity entity.CartItem
-	res := cal.db.Where(" cart_id = ? and product_name  = ?", id, productName).First(&cartItemEntity)
-	return cartItemEntity, res.Error
-}
-
-func (cal *calculator) getItemByID(ctx context.Context, id uint) (entity.CartItem, error) {
-	var cartItemEntity entity.CartItem
-	res := cal.db.WithContext(ctx).Where(" ID  = ?", id).First(&cartItemEntity)
-	return cartItemEntity, res.Error
-}
-
-func (cal *calculator) deleteItem(ctx context.Context, item entity.CartItem) error {
-	res := cal.db.WithContext(ctx).Delete(&item)
-	return res.Error
-}
-
 func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
-	cartEntity, err := cal.getCart(ctx, sessionID)
+	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
 	if err != nil {
 		return Response{Code: 302, RedirectURL: "/"}
 	}
@@ -152,12 +119,12 @@ func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID
 		return Response{Code: 302, RedirectURL: "/"}
 	}
 
-	cartItemEntity, err := cal.getItemByID(ctx, uint(_cartItemID))
+	cartItemEntity, err := cal.repo.GetItemByID(ctx, uint(_cartItemID))
 	if err != nil {
 		return Response{Code: 302, RedirectURL: "/"}
 	}
 
-	err = cal.deleteItem(ctx, cartItemEntity)
+	err = cal.repo.DeleteItem(ctx, cartItemEntity)
 	return Response{Code: 302, RedirectURL: "/", Error: err}
 }
 
@@ -167,29 +134,24 @@ func (cal *calculator) GetCartData(ctx context.Context, sessionID string) Respon
 			Code: 200,
 		}
 	}
-	data := cal.getCartItems(ctx, sessionID)
-	return Response{
-		Code: 200,
-		Data: data,
-	}
-}
 
-func (cal *calculator) getCartItems(ctx context.Context, sessionID string) (items []map[string]interface{}) {
-	db := cal.db
-
-	cartEntity, err := cal.getCart(ctx, sessionID)
+	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
 	if err != nil {
 		// TODO should return error in case of some error != recordNotFound
-		return
+		return Response{
+			Code: 200,
+		}
 	}
 
-	var cartItems []entity.CartItem
-	result := db.WithContext(ctx).Where(fmt.Sprintf("cart_id = %d", cartEntity.ID)).Find(&cartItems)
-	if result.Error != nil {
+	cartItems, err := cal.repo.GetItems(ctx, cartEntity.ID)
+	if err != nil {
 		// TODO should return error in case of some error != recordNotFound
-		return
+		return Response{
+			Code: 200,
+		}
 	}
 
+	data := make([]map[string]interface{}, 0)
 	for _, cartItem := range cartItems {
 		item := map[string]interface{}{
 			"ID":       cartItem.ID,
@@ -198,7 +160,10 @@ func (cal *calculator) getCartItems(ctx context.Context, sessionID string) (item
 			"Product":  cartItem.ProductName,
 		}
 
-		items = append(items, item)
+		data = append(data, item)
 	}
-	return items
+	return Response{
+		Code: 200,
+		Data: data,
+	}
 }
