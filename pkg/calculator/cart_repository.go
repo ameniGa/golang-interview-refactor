@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gorm.io/gorm"
 	"interview/pkg/entity"
@@ -15,6 +16,7 @@ type Repository interface {
 	GetItem(ctx context.Context, cartID uint, productName string) (entity.CartItem, error)
 	GetItems(ctx context.Context, cartID uint) ([]entity.CartItem, error)
 	DeleteItem(ctx context.Context, item entity.CartItem) error
+	DeleteCart(ctx context.Context, cart entity.CartEntity) error
 }
 
 type repository struct {
@@ -32,6 +34,9 @@ func (r *repository) GetCart(ctx context.Context, sessionID string) (entity.Cart
 }
 
 func (r *repository) AddCart(ctx context.Context, cart *entity.CartEntity) error {
+	if cart == nil || cart.SessionID == "" {
+		return errors.New("missing required fields")
+	}
 	res := r.db.WithContext(ctx).Create(cart)
 	return res.Error
 }
@@ -61,5 +66,10 @@ func (r *repository) GetItems(ctx context.Context, cartID uint) ([]entity.CartIt
 
 func (r *repository) DeleteItem(ctx context.Context, item entity.CartItem) error {
 	res := r.db.WithContext(ctx).Delete(&item)
+	return res.Error
+}
+
+func (r *repository) DeleteCart(ctx context.Context, cart entity.CartEntity) error {
+	res := r.db.WithContext(ctx).Delete(&cart)
 	return res.Error
 }
