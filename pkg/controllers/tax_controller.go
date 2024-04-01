@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"html/template"
 	"interview/pkg/calculator"
+	"interview/pkg/helpers"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -35,7 +34,7 @@ func (t *TaxController) ShowAddItemForm(c *gin.Context) {
 		data["CartItems"] = res.Data
 	}
 
-	html, err := renderTemplate(data)
+	html, err := helpers.RenderTemplate(data, "static/add_item_form.html")
 	if err != nil {
 		handleError(c, 500, err)
 		return
@@ -86,27 +85,6 @@ func (t *TaxController) DeleteCartItem(c *gin.Context) {
 
 	res := t.calculator.DeleteCartItem(c, cookie.Value, cartItemIDString)
 	handleError(c, res.Code, res.Error)
-}
-
-func renderTemplate(pageData interface{}) (string, error) {
-	// Read and parse the HTML template file
-	tmpl, err := template.ParseFiles("static/add_item_form.html")
-	if err != nil {
-		return "", fmt.Errorf("Error parsing template: %v ", err)
-	}
-
-	// Create a strings.Builder to store the rendered template
-	var renderedTemplate strings.Builder
-
-	err = tmpl.Execute(&renderedTemplate, pageData)
-	if err != nil {
-		return "", fmt.Errorf("Error parsing template: %v ", err)
-	}
-
-	// Convert the rendered template to a string
-	resultString := renderedTemplate.String()
-
-	return resultString, nil
 }
 
 func handleError(c *gin.Context, code int, err error) {
