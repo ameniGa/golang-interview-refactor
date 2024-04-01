@@ -1,10 +1,11 @@
 package db
 
-import "interview/pkg/entity"
+import (
+	"gorm.io/gorm"
+	"interview/pkg/entity"
+)
 
-func MigrateDatabase() {
-	db := GetDatabase()
-
+func migrate(db *gorm.DB) {
 	// AutoMigrate will create or update the tables based on the models
 	err := db.AutoMigrate(&entity.CartEntity{}, &entity.CartItem{})
 	if err != nil {
