@@ -4,11 +4,14 @@ import (
 	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"interview/pkg/calculator"
+	"interview/pkg/config"
+	"interview/pkg/db"
 	"interview/pkg/entity"
 	"math/rand"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -301,17 +304,11 @@ func addItem(t *testing.T, repo calculator.Repository, in *entity.CartItem) (fun
 }
 
 func getDatabase(t *testing.T) *gorm.DB {
-	// todo add config
-	dsn := "ice_user:ice_password@tcp(localhost:4001)/ice_db_test?charset=utf8mb4&parseTime=True&loc=Local"
+	_, filename, _, _ := runtime.Caller(0)
+	cfg, err := config.LoadConfig(filepath.Join(filepath.Dir(filename), "../../cmd/web-api/config/config.test.yml"))
+	require.NoError(t, err)
 
-	// Open the connection to the database
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatal("failed to connect database")
-	}
-	err = db.AutoMigrate(&entity.CartEntity{}, &entity.CartItem{})
-	if err != nil {
-		t.Fatal("failed to connect database")
-	}
-	return db
+	dbConn := db.Connect(&cfg.Database)
+
+	return dbConn
 }
