@@ -8,6 +8,7 @@ import (
 	"interview/pkg/entity"
 )
 
+// Repository defines the methods for interacting with the cart data storage
 type Repository interface {
 	GetCart(ctx context.Context, sessionID string) (entity.CartEntity, error)
 	AddCart(ctx context.Context, cart *entity.CartEntity) error
@@ -23,6 +24,7 @@ type repository struct {
 	db *gorm.DB
 }
 
+// NewRepository creates a repo implementation for MySQL database
 func NewRepository(db *gorm.DB) Repository {
 	return &repository{db: db}
 }

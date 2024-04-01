@@ -8,25 +8,27 @@ import (
 	"strconv"
 )
 
+// Handler encapsulates the behaviour of cart service
 type Handler interface {
 	AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response
 	DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response
 	GetCartData(ctx context.Context, sessionID string) Response
 }
 
-type calculator struct {
+type cartService struct {
 	repo         Repository
 	priceMapping map[string]float64
 }
 
-func NewCalculator(itemPriceMapping map[string]float64, repo Repository) (Handler, error) {
+// NewCartService creates a cart service implementation
+func NewCartService(itemPriceMapping map[string]float64, repo Repository) (Handler, error) {
 	if itemPriceMapping == nil {
 		return nil, errors.New("missing prices config")
 	}
 	if repo == nil {
 		panic("missing repository")
 	}
-	return &calculator{repo: repo, priceMapping: itemPriceMapping}, nil
+	return &cartService{repo: repo, priceMapping: itemPriceMapping}, nil
 }
 
 type CartItem struct {
@@ -34,7 +36,7 @@ type CartItem struct {
 	Quantity string
 }
 
-func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response {
+func (c *cartService) AddItemToCart(ctx context.Context, sessionID string, data CartItem) Response {
 	if sessionID == "" || data.Quantity == "" || data.Product == "" {
 		return Response{
 			Code:  302,
@@ -43,7 +45,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 
 	var isCartNew bool
-	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
+	cartEntity, err := c.repo.GetCart(ctx, sessionID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return Response{Code: 302, Error: err}
@@ -53,13 +55,13 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 			SessionID: sessionID,
 			Status:    entity.CartOpen,
 		}
-		err := cal.repo.AddCart(ctx, &cartEntity)
+		err := c.repo.AddCart(ctx, &cartEntity)
 		if err != nil {
 			return Response{Code: 302, Error: err}
 		}
 	}
 
-	item, ok := cal.priceMapping[data.Product]
+	item, ok := c.priceMapping[data.Product]
 	if !ok {
 		return Response{
 			Code:  302,
@@ -75,7 +77,7 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 
 	if !isCartNew {
-		cartItemEntity, err := cal.repo.GetItem(ctx, cartEntity.ID, data.Product)
+		cartItemEntity, err := c.repo.GetItem(ctx, cartEntity.ID, data.Product)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return Response{
 				Code:  302,
@@ -85,14 +87,14 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 		if err == nil {
 			cartItemEntity.Quantity += int(quantity)
 			cartItemEntity.Price += item * float64(quantity)
-			err = cal.repo.SaveItem(ctx, &cartItemEntity)
+			err = c.repo.SaveItem(ctx, &cartItemEntity)
 			return Response{
 				Code:  302,
 				Error: err,
 			}
 		}
 	}
-	err = cal.repo.SaveItem(ctx, &entity.CartItem{
+	err = c.repo.SaveItem(ctx, &entity.CartItem{
 		CartID:      cartEntity.ID,
 		ProductName: data.Product,
 		Quantity:    int(quantity),
@@ -104,8 +106,8 @@ func (cal *calculator) AddItemToCart(ctx context.Context, sessionID string, data
 	}
 }
 
-func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
-	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
+func (c *cartService) DeleteCartItem(ctx context.Context, sessionID, cartItemID string) Response {
+	cartEntity, err := c.repo.GetCart(ctx, sessionID)
 	if err != nil {
 		return Response{Code: 302}
 	}
@@ -119,23 +121,23 @@ func (cal *calculator) DeleteCartItem(ctx context.Context, sessionID, cartItemID
 		return Response{Code: 302}
 	}
 
-	cartItemEntity, err := cal.repo.GetItemByID(ctx, uint(_cartItemID))
+	cartItemEntity, err := c.repo.GetItemByID(ctx, uint(_cartItemID))
 	if err != nil {
 		return Response{Code: 302}
 	}
 
-	err = cal.repo.DeleteItem(ctx, cartItemEntity)
+	err = c.repo.DeleteItem(ctx, cartItemEntity)
 	return Response{Code: 302, Error: err}
 }
 
-func (cal *calculator) GetCartData(ctx context.Context, sessionID string) Response {
+func (c *cartService) GetCartData(ctx context.Context, sessionID string) Response {
 	if sessionID == "" {
 		return Response{
 			Code: 200,
 		}
 	}
 
-	cartEntity, err := cal.repo.GetCart(ctx, sessionID)
+	cartEntity, err := c.repo.GetCart(ctx, sessionID)
 	if err != nil {
 		// TODO should return error in case of some error != recordNotFound
 		return Response{
@@ -143,7 +145,7 @@ func (cal *calculator) GetCartData(ctx context.Context, sessionID string) Respon
 		}
 	}
 
-	cartItems, err := cal.repo.GetItems(ctx, cartEntity.ID)
+	cartItems, err := c.repo.GetItems(ctx, cartEntity.ID)
 	if err != nil {
 		// TODO should return error in case of some error != recordNotFound
 		return Response{

@@ -31,7 +31,7 @@ func main() {
 		"bag":   300,
 		"watch": 300,
 	}
-	cal, err := calculator.NewCalculator(itemPriceMapping, calculator.NewRepository(dbConn))
+	cal, err := calculator.NewCartService(itemPriceMapping, calculator.NewRepository(dbConn))
 	if err != nil {
 		panic(err)
 	}

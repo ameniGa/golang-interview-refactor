@@ -26,7 +26,7 @@ func TestRepository_AddCart(t *testing.T) {
 	}
 	repo := calculator.NewRepository(getDatabase(t))
 
-	t.Run("add cart successfully", func(t *testing.T) {
+	t.Run("add cartService successfully", func(t *testing.T) {
 		cleanUp, err := addCart(t, repo, &in)
 		defer cleanUp()
 
@@ -58,13 +58,13 @@ func TestRepository_GetCart(t *testing.T) {
 	require.NoError(t, err)
 	defer cleanup()
 
-	t.Run("get existing cart successfully", func(t *testing.T) {
+	t.Run("get existing cartService successfully", func(t *testing.T) {
 		cart, err := repo.GetCart(context.TODO(), in.SessionID)
 		assert.NoError(t, err)
 		assert.Equal(t, in.ID, cart.ID)
 	})
 
-	t.Run("non existing cart", func(t *testing.T) {
+	t.Run("non existing cartService", func(t *testing.T) {
 		cart, err := repo.GetCart(context.TODO(), "_")
 		assert.IsType(t, gorm.ErrRecordNotFound, err)
 		assert.Empty(t, cart.ID)
@@ -247,7 +247,7 @@ func TestRepository_GetItems(t *testing.T) {
 		assert.Equal(t, item1.ID, res[0].ID)
 	})
 
-	t.Run("non exiting cart", func(t *testing.T) {
+	t.Run("non exiting cartService", func(t *testing.T) {
 		res, err := repo.GetItems(context.TODO(), 0)
 		assert.NoError(t, err)
 		assert.Empty(t, res)
