@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 	"interview/pkg/calculator"
 	"interview/pkg/config"
 	"interview/pkg/controllers"
@@ -13,18 +12,19 @@ import (
 )
 
 var configFile = flag.String("config", "cmd/web-api/config/config.dev.yml", "Path of the configuration file.")
+var envFile = flag.String("env", "cmd/web-api/config/.env", "Path of the environment variables file.")
 
 func main() {
 	flag.Parse()
-	cfg, err := config.LoadConfig(*configFile)
+	cfg, err := config.LoadConfig(*configFile, *envFile)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(viper.GetString("DB_PASSWORD"))
 	dbConn := db.Connect(&cfg.Database)
 
 	ginEngine := gin.Default()
+
 	itemPriceMapping := map[string]float64{
 		"shoe":  100,
 		"purse": 200,
