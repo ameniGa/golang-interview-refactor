@@ -1,0 +1,11 @@
+server:
+  host:
+  port: 8080
+
+database:
+  name: ice_db_test
+  type: mysql
+  username: test
+  password: test
+  host: localhost
+  port: 4001

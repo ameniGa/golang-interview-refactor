@@ -11,10 +11,10 @@ services:
     ports:
       - "4001:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=9xz3jrd8wf
+      - MYSQL_ROOT_PASSWORD=$DB_ROOT_PASSWORD
       - MYSQL_DATABASE=ice_db
-      - MYSQL_USER=ice_user
-      - MYSQL_PASSWORD=9xz3jrd8wf
+      - MYSQL_USER=$DB_USERNAME
+      - MYSQL_PASSWORD=$DB_PASSWORD
     volumes:
       - orm_data_mysql:/var/lib/mysql
 

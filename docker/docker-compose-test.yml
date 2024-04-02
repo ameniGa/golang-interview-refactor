@@ -1,0 +1,11 @@
+version: "3.7"
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "4001:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_test
+      - MYSQL_DATABASE=ice_db_test
+      - MYSQL_USER=test
+      - MYSQL_PASSWORD=test
